@@ -11,7 +11,7 @@ import UIKit
 import AlamofireImage
 
 
-class PhotosViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
+class PhotosViewController: UIViewController, UITableViewDataSource, UITableViewDelegate, UIScrollViewDelegate {
 
     @IBOutlet weak var tableView: UITableView!
     
@@ -38,7 +38,7 @@ class PhotosViewController: UIViewController, UITableViewDataSource, UITableView
                 // Get the dictionary from the response key
                 let responseDictionary = dataDictionary["response"] as! [String: Any]
                 // Store the returned array of dictionaries in our posts property
-                self.posts = responseDictionary["posts"] as! [[String: Any]]
+                self.posts += responseDictionary["posts"] as! [[String: Any]]
                 
                 // Reload the table view
                 self.tableView.reloadData()
@@ -78,7 +78,7 @@ class PhotosViewController: UIViewController, UITableViewDataSource, UITableView
                 // Get the dictionary from the response key
                 let responseDictionary = dataDictionary["response"] as! [String: Any]
                 // Store the returned array of dictionaries in our posts property
-                self.posts = responseDictionary["posts"] as! [[String: Any]]
+                self.posts += responseDictionary["posts"] as! [[String: Any]]
                 
                 // Reload the table view
                 self.tableView.reloadData()
@@ -88,7 +88,49 @@ class PhotosViewController: UIViewController, UITableViewDataSource, UITableView
         task.resume()
         // Do any additional setup after loading the view.
     }
+    
+    var isMoreDataLoading = false
 
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        if (!isMoreDataLoading) {
+            // Calculate the position of one screen length before the bottom of the results
+            let scrollViewContentHeight = tableView.contentSize.height
+            let scrollOffsetThreshold = scrollViewContentHeight - tableView.bounds.size.height
+            
+            // When the user has scrolled past the threshold, start requesting
+            if(scrollView.contentOffset.y > scrollOffsetThreshold && tableView.isDragging) {
+                isMoreDataLoading = true
+                
+                loadMoreData()
+            }
+        }
+    }
+    func loadMoreData() {
+        // Network request snippet
+        let url = URL(string: "https://api.tumblr.com/v2/blog/humansofnewyork.tumblr.com/posts/photo?api_key=Q6vHoaVm5L1u2ZAW1fqv3Jw48gFzYVg9P0vH0VHl3GVy6quoGV&offset=\(self.posts.count)")!
+        let session = URLSession(configuration: .default,    delegate: nil, delegateQueue: OperationQueue.main)
+        session.configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        let task = session.dataTask(with: url) { (data, response, error) in
+            if let error = error {
+                print(error.localizedDescription)
+            } else if let data = data,
+                let dataDictionary = try! JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
+                print(dataDictionary)
+                
+                // Get the posts and store in posts property
+                
+                // Get the dictionary from the response key
+                let responseDictionary = dataDictionary["response"] as! [String: Any]
+                // Store the returned array of dictionaries in our posts property
+                self.posts += responseDictionary["posts"] as! [[String: Any]]
+                
+                // Reload the table view
+                self.tableView.reloadData()
+            }
+        }
+        task.resume()
+    }
+    
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
         // Dispose of any resources that can be recreated.
@@ -116,6 +158,7 @@ class PhotosViewController: UIViewController, UITableViewDataSource, UITableView
             // 4.
             let url = URL(string: urlString)
             
+            cell.photoImage.image = nil
             cell.photoImage.af_setImage(withURL: url!)
         }
         
